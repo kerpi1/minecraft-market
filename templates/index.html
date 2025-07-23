@@ -22,14 +22,8 @@
             <div class="buttons-container">
                 <a href="{{ url_for('build_detail', build_id=build.id) }}" class="btn">Подробнее</a>
                 {% if current_user.is_authenticated %}
-                    {% set user_license = None %}
-                    {% for license in current_user.licenses %}
-                        {% if license.build_id == build.id and license.is_active %}
-                            {% set user_license = license %}
-                        {% endif %}
-                    {% endfor %}
-
-                    {% if user_license %}
+                    {% set user_license = user_licenses_dict[build.id] if build.id in user_licenses_dict else None %}
+                    {% if user_license and user_license.is_active %}
                         {% if not user_license.expires_at or user_license.expires_at > datetime.utcnow() %}
                             <button class="btn btn-secondary" disabled>Уже куплено</button>
                         {% else %}

@@ -17,12 +17,12 @@ body {
 .build-card {
     background-color: #1a1a2e;
     padding: 20px;
-    border-radius: 24px;
+    border-radius: 8px;
     margin-bottom: 20px;
     display: flex;
     flex-direction: column;
-    justify-content: space-between; /* Размещает заголовок, описание и кнопки равномерно */
-    min-height: 300px; /* Минимальная высота карточки */
+    justify-content: space-between;
+    min-height: 300px;
 }
 
 .build-title {
@@ -34,8 +34,8 @@ body {
 .build-description {
     color: #a0a0a0;
     line-height: 1.5;
-    max-height: 100px; /* Ограничиваем высоту описания */
-    overflow-y: auto; /* Добавляем полосу прокрутки при необходимости */
+    max-height: 100px;
+    overflow-y: auto;
 }
 
 .build-price {
@@ -47,23 +47,31 @@ body {
 
 .buttons-container {
     display: flex;
-    gap: 10px; /* Расстояние между кнопками */
-    margin-top: auto; /* Позиционирует кнопки внизу */
+    gap: 10px;
+    margin-top: auto;
 }
 
 .btn {
     background-color: #2d2d44;
     color: #e0e0e0;
     border: none;
-    padding: 20px 20px;
-    border-radius: 24px;
+    padding: 10px 20px;
+    border-radius: 4px;
     cursor: pointer;
     transition: background-color 0.3s ease;
-    height: 40px; /* Фиксированная высота кнопок */
+    height: 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    font-weight: bold;
+    font-size: 14px;
+    box-sizing: border-box;
 }
 
 .btn:hover {
     background-color: #4ecca3;
+    color: #000;
 }
 
 .btn-secondary {
@@ -71,9 +79,58 @@ body {
     color: #000;
 }
 
-.btn-disabled {
+.btn-secondary:hover {
+    background-color: #3daa8a;
+}
+
+.btn:disabled {
     background-color: #6c757d;
     cursor: not-allowed;
+    color: #ffffff;
+}
+
+/* Убираем дефолтные стили для кнопок в формах */
+form {
+    display: inline;
+    margin: 0;
+    padding: 0;
+}
+
+form button[type="submit"].btn {
+    background-color: #2d2d44;
+    color: #e0e0e0;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 16px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    height: 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 14px;
+    width: auto;
+}
+
+form button[type="submit"].btn:hover {
+    background-color: #4ecca3;
+    color: #000;
+}
+
+form button[type="submit"].btn-secondary {
+    background-color: #4ecca3;
+    color: #000;
+}
+
+form button[type="submit"].btn-secondary:hover {
+    background-color: #3daa8a;
+}
+
+form button[type="submit"].btn:disabled {
+    background-color: #6c757d;
+    cursor: not-allowed;
+    color: #ffffff;
 }
 
 /* Навигация */

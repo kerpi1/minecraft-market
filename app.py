@@ -175,18 +175,16 @@ def index():
     # Получаем все активные сборки
     builds = Build.query.filter_by(is_active=True).all()
 
-    # Если пользователь авторизован, получаем его лицензии
-    user_licenses = []
+    # Передаем все лицензии пользователя (если авторизован)
+    user_licenses_dict = {}
     if current_user.is_authenticated:
-        licenses = LicenseKey.query.filter_by(
-            user_id=current_user.id,
-            is_active=True
-        ).all()
-        user_licenses = [license.build_id for license in licenses]
+        licenses = LicenseKey.query.filter_by(user_id=current_user.id).all()
+        for license in licenses:
+            if license.build_id:
+                user_licenses_dict[license.build_id] = license
 
     # Передаем datetime в контекст шаблона
-    return render_template('index.html', builds=builds, user_licenses=user_licenses, datetime=datetime)
-
+    return render_template('index.html', builds=builds, user_licenses_dict=user_licenses_dict, datetime=datetime)
 
 @app.route('/download')
 def download_launcher():
