@@ -1,12 +1,15 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_from_directory
-from flask_sqlalchemy import SQLAlchemy
-from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
-from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime, timedelta
+# app.py
 import os
 import secrets
 import string
+from datetime import datetime, timedelta
+
 import jwt
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
+from flask_sqlalchemy import SQLAlchemy
+from werkzeug.security import generate_password_hash, check_password_hash
+from sqlalchemy.exc import SQLAlchemyError
 
 # Создание приложения Flask
 app = Flask(__name__)
@@ -43,16 +46,10 @@ class Build(db.Model):
     is_active = db.Column(db.Boolean, default=True)
 
 
-class UserBuild(db.Model):
-    """Эта таблица нужна для отслеживания покупок пользователей.
-    Хотя мы используем LicenseKey, эта таблица может быть полезна
-    для хранения дополнительной информации о покупке (дата покупки, сумма и т.д.)"""
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    build_id = db.Column(db.Integer, db.ForeignKey('build.id'))
-    purchased_at = db.Column(db.DateTime, default=datetime.utcnow)
-    expires_at = db.Column(db.DateTime)
-
+# class UserBuild(db.Model):
+#     """Эта таблица была неиспользуемой и удалена.
+#     Вся информация о покупках хранится в LicenseKey."""
+#     pass
 
 class LicenseKey(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -61,11 +58,10 @@ class LicenseKey(db.Model):
     build_id = db.Column(db.Integer, db.ForeignKey('build.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     expires_at = db.Column(db.DateTime)
-    is_active = db.Column(db.Boolean, default=True)
-
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
     # Связи
-    user = db.relationship('User', backref='licenses')
-    build = db.relationship('Build', backref='licenses')
+    user = db.relationship('User', backref=db.backref('licenses', lazy=True))
+    build = db.relationship('Build', backref=db.backref('licenses', lazy=True))
 
 
 # Функция для генерации лицензионных ключей
@@ -107,66 +103,62 @@ def load_user(user_id):
     return User.query.get(int(user_id))
 
 
-# Создание базы данных
-with app.app_context():
-    # Убедимся, что папка существует перед созданием таблиц
-    database_path = app.config['SQLALCHEMY_DATABASE_URI'].replace('sqlite:///', '')
-    database_dir = os.path.dirname(database_path)
-    if not os.path.exists(database_dir):
-        os.makedirs(database_dir)
+# Создание базы данных и начальных данных
+def create_initial_data():
+    with app.app_context():
+        db.create_all()
 
-    # Создаем все таблицы
-    db.create_all()
-
-    # Создание администратора по умолчанию
-    if not User.query.filter_by(username='admin').first():
-        admin = User(
-            username='admin',
-            email='admin@marketplace.local',
-            password_hash=generate_password_hash('admin123'),
-            is_admin=True
-        )
-        db.session.add(admin)
-        db.session.commit()
-        print("Администратор создан: логин 'admin', пароль 'admin123'")
-
-    # Создание тестовых сборок если их нет
-    try:
-        if Build.query.count() == 0:
-            test_builds = [
-                Build(
-                    name='SkyBlock Ultimate',
-                    description='Современная сборка SkyBlock с уникальными механиками и балансом.',
-                    long_description='Полное описание SkyBlock Ultimate. Эта сборка включает в себя множество уникальных механик, которые делают игру увлекательной и интересной. Здесь вы найдете сбалансированный геймплей с продуманными системами прогресса.',
-                    price=999,
-                    minecraft_version='1.19.2',
-                    author='SkyTeam'
-                ),
-                Build(
-                    name='TechCraft Pro',
-                    description='Технологическая сборка с модами на автоматизацию и производство.',
-                    long_description='Подробное описание TechCraft Pro. Сборка для тех, кто любит автоматизацию и технологии. Включает в себя лучшие технические моды, которые позволят вам создать настоящие заводы и автоматизированные системы.',
-                    price=1499,
-                    minecraft_version='1.18.2',
-                    author='TechMasters'
-                ),
-                Build(
-                    name='Magic World',
-                    description='Магическая сборка с заклинаниями, магическими рудами и артефактами.',
-                    long_description='Полное описание Magic World. Погрузитесь в мир магии и чародейства. Эта сборка предлагает уникальную магическую систему с заклинаниями, магическими рудами и мощными артефактами, которые помогут вам в ваших приключениях.',
-                    price=1299,
-                    minecraft_version='1.20.1',
-                    author='MagicCrafters'
-                )
-            ]
-
-            for build in test_builds:
-                db.session.add(build)
-
+        # Создание администратора по умолчанию
+        if not User.query.filter_by(username='admin').first():
+            admin = User(
+                username='admin',
+                email='admin@marketplace.local',
+                password_hash=generate_password_hash('admin123'),
+                is_admin=True
+            )
+            db.session.add(admin)
             db.session.commit()
-            print("Тестовые сборки созданы")
-    except Exception as e:
-        print(f"Ошибка при создании тестовых сборок: {e}")
+            print("Администратор создан: логин 'admin', пароль 'admin123'")
+
+        # Создание тестовых сборок если их нет
+        try:
+            if Build.query.count() == 0:
+                test_builds = [
+                    Build(
+                        name='SkyBlock Ultimate',
+                        description='Современная сборка SkyBlock с уникальными механиками и балансом.',
+                        long_description='Полное описание SkyBlock Ultimate. Эта сборка включает в себя множество уникальных механик, которые делают игру увлекательной и интересной. Здесь вы найдете сбалансированный геймплей с продуманными системами прогресса.',
+                        price=999,
+                        minecraft_version='1.19.2',
+                        author='SkyTeam'
+                    ),
+                    Build(
+                        name='TechCraft Pro',
+                        description='Технологическая сборка с модами на автоматизацию и производство.',
+                        long_description='Подробное описание TechCraft Pro. Сборка для тех, кто любит автоматизацию и технологии. Включает в себя лучшие технические моды, которые позволят вам создать настоящие заводы и автоматизированные системы.',
+                        price=1499,
+                        minecraft_version='1.18.2',
+                        author='TechMasters'
+                    ),
+                    Build(
+                        name='Magic World',
+                        description='Магическая сборка с заклинаниями, магическими рудами и артефактами.',
+                        long_description='Полное описание Magic World. Погрузитесь в мир магии и чародейства. Эта сборка предлагает уникальную магическую систему с заклинаниями, магическими рудами и мощными артефактами, которые помогут вам в ваших приключениях.',
+                        price=1299,
+                        minecraft_version='1.20.1',
+                        author='MagicCrafters'
+                    )
+                ]
+                for build in test_builds:
+                    db.session.add(build)
+                db.session.commit()
+                print("Тестовые сборки созданы")
+        except Exception as e:
+            print(f"Ошибка при создании тестовых сборок: {e}")
+
+
+# Вызываем функцию создания данных при запуске
+create_initial_data()
 
 
 # Маршруты
@@ -174,7 +166,6 @@ with app.app_context():
 def index():
     # Получаем все активные сборки
     builds = Build.query.filter_by(is_active=True).all()
-
     # Передаем все лицензии пользователя (если авторизован)
     user_licenses_dict = {}
     if current_user.is_authenticated:
@@ -182,9 +173,9 @@ def index():
         for license in licenses:
             if license.build_id:
                 user_licenses_dict[license.build_id] = license
-
     # Передаем datetime в контекст шаблона
     return render_template('index.html', builds=builds, user_licenses_dict=user_licenses_dict, datetime=datetime)
+
 
 @app.route('/download')
 def download_launcher():
@@ -199,7 +190,6 @@ def login():
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
-
         user = User.query.filter_by(username=username).first()
         if user and check_password_hash(user.password_hash, password):
             login_user(user)
@@ -207,7 +197,6 @@ def login():
             return redirect(url_for('profile'))
         else:
             flash('Неверное имя пользователя или пароль!', 'error')
-
     return render_template('login.html')
 
 
@@ -218,31 +207,30 @@ def register():
         email = request.form['email']
         password = request.form['password']
         confirm_password = request.form['confirm_password']
-
         if password != confirm_password:
             flash('Пароли не совпадают!', 'error')
             return render_template('register.html')
-
         if User.query.filter_by(username=username).first():
             flash('Пользователь с таким именем уже существует!', 'error')
             return render_template('register.html')
-
         if User.query.filter_by(email=email).first():
             flash('Пользователь с такой почтой уже существует!', 'error')
             return render_template('register.html')
 
-        user = User(
-            username=username,
-            email=email,
-            password_hash=generate_password_hash(password)
-        )
-
-        db.session.add(user)
-        db.session.commit()
-
-        flash('Регистрация прошла успешно! Теперь вы можете войти.', 'success')
-        return redirect(url_for('login'))
-
+        try:
+            user = User(
+                username=username,
+                email=email,
+                password_hash=generate_password_hash(password)
+            )
+            db.session.add(user)
+            db.session.commit()
+            flash('Регистрация прошла успешно! Теперь вы можете войти.', 'success')
+            return redirect(url_for('login'))
+        except SQLAlchemyError as e:
+            db.session.rollback()
+            flash('Ошибка при регистрации. Попробуйте позже.', 'error')
+            app.logger.error(f"Ошибка регистрации: {e}")
     return render_template('register.html')
 
 
@@ -256,19 +244,8 @@ def profile():
 @app.route('/build/<int:build_id>')
 def build_detail(build_id):
     build = Build.query.get_or_404(build_id)
-
-    # Проверяем, куплена ли сборка текущим пользователем
-    is_purchased = False
-    if current_user.is_authenticated:
-        license = LicenseKey.query.filter_by(
-            user_id=current_user.id,
-            build_id=build_id,
-            is_active=True
-        ).first()
-        is_purchased = license is not None
-
     # Передаем datetime в контекст шаблона
-    return render_template('build_detail.html', build=build, is_purchased=is_purchased, datetime=datetime)
+    return render_template('build_detail.html', build=build, datetime=datetime)
 
 
 @app.route('/admin')
@@ -277,18 +254,14 @@ def admin():
     if not current_user.is_admin:
         flash('Доступ запрещен!', 'error')
         return redirect(url_for('index'))
-
     # Статистика
     total_users = User.query.count()
     total_builds = Build.query.count()
     total_sales = LicenseKey.query.count()
-
     # Все сборки
     builds = Build.query.all()
-
     # Все пользователи для выпадающего списка
     users = User.query.all()
-
     return render_template('admin.html',
                            total_users=total_users,
                            total_builds=total_builds,
@@ -303,7 +276,6 @@ def create_build():
     if not current_user.is_admin:
         flash('Доступ запрещен!', 'error')
         return redirect(url_for('index'))
-
     try:
         name = request.form.get('name')
         description = request.form.get('description')
@@ -311,24 +283,32 @@ def create_build():
         price = int(request.form.get('price'))
         minecraft_version = request.form.get('minecraft_version')
         author = request.form.get('author')
-
+        # Валидация
+        if not name or price < 0:
+            raise ValueError("Некорректные данные")
         # Создаем новую сборку
         new_build = Build(
             name=name,
-            description=description[:200],  # Ограничиваем описание 200 символами
+            description=description[:200] if description else "",  # Ограничиваем описание 200 символами
             long_description=long_description,
             price=price,
             minecraft_version=minecraft_version,
             author=author
         )
-
         db.session.add(new_build)
         db.session.commit()
-
         flash(f'Сборка "{name}" успешно создана!', 'success')
+    except ValueError as ve:
+        flash('Ошибка в данных формы!', 'error')
+        app.logger.warning(f"Ошибка валидации при создании сборки: {ve}")
+    except SQLAlchemyError as se:
+        db.session.rollback()
+        flash('Ошибка базы данных при создании сборки!', 'error')
+        app.logger.error(f"Ошибка БД при создании сборки: {se}")
     except Exception as e:
+        db.session.rollback()
         flash('Ошибка при создании сборки!', 'error')
-
+        app.logger.error(f"Неизвестная ошибка при создании сборки: {e}")
     return redirect(url_for('admin'))
 
 
@@ -338,25 +318,41 @@ def edit_build(build_id):
     if not current_user.is_admin:
         flash('Доступ запрещен!', 'error')
         return redirect(url_for('index'))
-
     build = Build.query.get_or_404(build_id)
-
     if request.method == 'POST':
         try:
-            build.name = request.form.get('name')
-            build.description = request.form.get('description')[:200]
-            build.long_description = request.form.get('long_description')
-            build.price = int(request.form.get('price'))
-            build.minecraft_version = request.form.get('minecraft_version')
-            build.author = request.form.get('author')
-            build.is_active = 'is_active' in request.form
+            name = request.form.get('name')
+            description = request.form.get('description')
+            long_description = request.form.get('long_description')
+            price = int(request.form.get('price'))
+            minecraft_version = request.form.get('minecraft_version')
+            author = request.form.get('author')
 
+            # Валидация
+            if not name or price < 0:
+                raise ValueError("Некорректные данные")
+
+            build.name = name
+            build.description = description[:200] if description else ""
+            build.long_description = long_description
+            build.price = price
+            build.minecraft_version = minecraft_version
+            build.author = author
+            build.is_active = 'is_active' in request.form
             db.session.commit()
             flash(f'Сборка "{build.name}" успешно обновлена!', 'success')
             return redirect(url_for('admin'))
+        except ValueError as ve:
+            flash('Ошибка в данных формы!', 'error')
+            app.logger.warning(f"Ошибка валидации при редактировании сборки {build_id}: {ve}")
+        except SQLAlchemyError as se:
+            db.session.rollback()
+            flash('Ошибка базы данных при обновлении сборки!', 'error')
+            app.logger.error(f"Ошибка БД при редактировании сборки {build_id}: {se}")
         except Exception as e:
+            db.session.rollback()
             flash('Ошибка при обновлении сборки!', 'error')
-
+            app.logger.error(f"Неизвестная ошибка при редактировании сборки {build_id}: {e}")
     return render_template('edit_build.html', build=build)
 
 
@@ -366,11 +362,17 @@ def grant_access():
     if not current_user.is_admin:
         flash('Доступ запрещен!', 'error')
         return redirect(url_for('index'))
-
     try:
         user_id = int(request.form.get('user_id'))
         build_id = int(request.form.get('build_id'))
         duration = request.form.get('duration')  # 5min, 30min, 1month
+
+        # Проверяем существование пользователя и сборки
+        user = User.query.get(user_id)
+        build = Build.query.get(build_id)
+        if not user or not build:
+            flash('Пользователь или сборка не найдены!', 'error')
+            return redirect(url_for('admin'))
 
         # Определяем срок действия
         expires_at = None
@@ -386,7 +388,6 @@ def grant_access():
             user_id=user_id,
             build_id=build_id
         ).first()
-
         if existing_license:
             # Обновляем существующую лицензию
             existing_license.expires_at = expires_at
@@ -407,13 +408,18 @@ def grant_access():
             )
             db.session.add(new_license)
             flash(f'Доступ к сборке успешно предоставлен на {duration}!', 'success')
-
         db.session.commit()
-
+    except ValueError as ve:
+        flash('Некорректные данные!', 'error')
+        app.logger.warning(f"Ошибка валидации в grant_access: {ve}")
+    except SQLAlchemyError as se:
+        db.session.rollback()
+        flash('Ошибка базы данных при предоставлении доступа!', 'error')
+        app.logger.error(f"Ошибка БД в grant_access: {se}")
     except Exception as e:
         db.session.rollback()
         flash('Ошибка при предоставлении доступа!', 'error')
-
+        app.logger.error(f"Неизвестная ошибка в grant_access: {e}")
     return redirect(url_for('admin'))
 
 
@@ -423,28 +429,39 @@ def revoke_access():
     if not current_user.is_admin:
         flash('Доступ запрещен!', 'error')
         return redirect(url_for('index'))
-
     try:
         user_id = int(request.form.get('user_id'))
         build_id = int(request.form.get('build_id'))
+
+        # Проверяем существование пользователя и сборки
+        user = User.query.get(user_id)
+        build = Build.query.get(build_id)
+        if not user or not build:
+            flash('Пользователь или сборка не найдены!', 'error')
+            return redirect(url_for('admin'))
 
         # Находим лицензию и деактивируем её
         license = LicenseKey.query.filter_by(
             user_id=user_id,
             build_id=build_id
         ).first()
-
         if license:
             license.is_active = False
             db.session.commit()
             flash('Доступ к сборке успешно отозван!', 'success')
         else:
             flash('Лицензия не найдена!', 'error')
-
+    except ValueError as ve:
+        flash('Некорректные данные!', 'error')
+        app.logger.warning(f"Ошибка валидации в revoke_access: {ve}")
+    except SQLAlchemyError as se:
+        db.session.rollback()
+        flash('Ошибка базы данных при отзыве доступа!', 'error')
+        app.logger.error(f"Ошибка БД в revoke_access: {se}")
     except Exception as e:
         db.session.rollback()
         flash('Ошибка при отзыве доступа!', 'error')
-
+        app.logger.error(f"Неизвестная ошибка в revoke_access: {e}")
     return redirect(url_for('admin'))
 
 
@@ -452,38 +469,42 @@ def revoke_access():
 @login_required
 def purchase_build(build_id):
     build = Build.query.get_or_404(build_id)
-
-    # Проверяем, не куплена ли уже эта сборка (и не истекла ли)
-    existing_license = LicenseKey.query.filter_by(
-        user_id=current_user.id,
-        build_id=build_id
-    ).first()
-
-    # Определяем срок действия (по умолчанию 1 месяц)
-    expires_at = datetime.utcnow() + timedelta(days=30)
-
-    if existing_license:
-        # Если лицензия существует, обновляем её
-        existing_license.expires_at = expires_at
-        existing_license.is_active = True
-        existing_license.key = generate_license_key()  # Генерируем новый ключ
-        existing_license.created_at = datetime.utcnow()
-        flash(f'Доступ к сборке "{build.name}" успешно продлен!', 'success')
-    else:
-        # Создаем новую лицензию
-        license_key = generate_license_key()
-        new_license = LicenseKey(
-            key=license_key,
+    try:
+        # Проверяем, не куплена ли уже эта сборка (и не истекла ли)
+        existing_license = LicenseKey.query.filter_by(
             user_id=current_user.id,
-            build_id=build_id,
-            is_active=True,
-            expires_at=expires_at
-        )
-
-        db.session.add(new_license)
-        flash(f'Поздравляем! Вы успешно приобрели сборку "{build.name}"!', 'success')
-
-    db.session.commit()
+            build_id=build_id
+        ).first()
+        # Определяем срок действия (по умолчанию 1 месяц)
+        expires_at = datetime.utcnow() + timedelta(days=30)
+        if existing_license:
+            # Если лицензия существует, обновляем её
+            existing_license.expires_at = expires_at
+            existing_license.is_active = True
+            existing_license.key = generate_license_key()  # Генерируем новый ключ
+            existing_license.created_at = datetime.utcnow()
+            flash(f'Доступ к сборке "{build.name}" успешно продлен!', 'success')
+        else:
+            # Создаем новую лицензию
+            license_key = generate_license_key()
+            new_license = LicenseKey(
+                key=license_key,
+                user_id=current_user.id,
+                build_id=build_id,
+                is_active=True,
+                expires_at=expires_at
+            )
+            db.session.add(new_license)
+            flash(f'Поздравляем! Вы успешно приобрели сборку "{build.name}"!', 'success')
+        db.session.commit()
+    except SQLAlchemyError as se:
+        db.session.rollback()
+        flash('Ошибка базы данных при покупке!', 'error')
+        app.logger.error(f"Ошибка БД при покупке сборки {build_id}: {se}")
+    except Exception as e:
+        db.session.rollback()
+        flash('Ошибка при покупке сборки!', 'error')
+        app.logger.error(f"Неизвестная ошибка при покупке сборки {build_id}: {e}")
     return redirect(url_for('profile'))
 
 
@@ -500,29 +521,22 @@ def logout():
 def api_login():
     try:
         data = request.get_json()
-
         if not data:
             return jsonify({'error': 'No data provided'}), 400
-
         username = data.get('username')
         password = data.get('password')
-
         if not username or not password:
             return jsonify({'error': 'Username and password required'}), 400
-
         # Проверяем учетные данные
         user = User.query.filter_by(username=username).first()
-
         if user and check_password_hash(user.password_hash, password):
             # Генерируем токен
             token = generate_token(user.id)
-
             # Получаем список купленных сборок
             licenses = LicenseKey.query.filter_by(
                 user_id=user.id,
                 is_active=True
             ).all()
-
             builds = []
             for license in licenses:
                 if license.build and (not license.expires_at or license.expires_at > datetime.utcnow()):
@@ -531,7 +545,6 @@ def api_login():
                         'name': license.build.name,
                         'version': license.build.minecraft_version
                     })
-
             return jsonify({
                 'success': True,
                 'token': token,
@@ -544,8 +557,8 @@ def api_login():
             }), 200
         else:
             return jsonify({'success': False, 'error': 'Invalid credentials'}), 401
-
     except Exception as e:
+        app.logger.error(f"Ошибка в api_login: {e}")
         return jsonify({'error': 'Internal server error'}), 500
 
 
@@ -556,32 +569,25 @@ def api_get_all_builds():
         auth_header = request.headers.get('Authorization')
         if not auth_header:
             return jsonify({'error': 'Authorization header required'}), 401
-
         # Извлекаем токен
         token = auth_header.replace('Bearer ', '') if auth_header.startswith('Bearer ') else auth_header
-
         # Проверяем токен
         user_id = verify_token(token)
         if not user_id:
             return jsonify({'error': 'Invalid or expired token'}), 401
-
         # Получаем пользователя
         user = User.query.get(user_id)
         if not user:
             return jsonify({'error': 'User not found'}), 404
-
         # Получаем все активные сборки
         builds = Build.query.filter_by(is_active=True).all()
-
         # Получаем лицензии пользователя
         user_licenses = LicenseKey.query.filter_by(
             user_id=user_id,
             is_active=True
         ).all()
-
         licensed_build_ids = [license.build_id for license in user_licenses
                               if not license.expires_at or license.expires_at > datetime.utcnow()]
-
         builds_data = []
         for build in builds:
             builds_data.append({
@@ -592,12 +598,11 @@ def api_get_all_builds():
                 'price': build.price,
                 'purchased': build.id in licensed_build_ids
             })
-
         return jsonify({
             'builds': builds_data
         }), 200
-
     except Exception as e:
+        app.logger.error(f"Ошибка в api_get_all_builds: {e}")
         return jsonify({'error': 'Internal server error'}), 500
 
 
@@ -615,6 +620,7 @@ def api_get_build(build_id):
             'author': build.author
         }), 200
     except Exception as e:
+        app.logger.error(f"Ошибка в api_get_build: {e}")
         return jsonify({'error': 'Build not found'}), 404
 
 

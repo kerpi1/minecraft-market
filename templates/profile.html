@@ -1,10 +1,8 @@
+<!-- templates/profile.html -->
 {% extends "base.html" %}
-
 {% block title %}Профиль - Minecraft Marketplace{% endblock %}
-
 {% block content %}
 <h2>Личный кабинет</h2>
-
 <div style="background-color: #1a1a2e; padding: 20px; border-radius: 8px; margin-bottom: 30px;">
     <h3>Информация о профиле</h3>
     <p><strong>Логин:</strong> {{ current_user.username }}</p>
@@ -18,7 +16,6 @@
         {% endif %}
     </p>
 </div>
-
 <h3>Мои сборки</h3>
 {% set active_licenses = [] %}
 {% set expired_licenses = [] %}
@@ -31,7 +28,6 @@
         {% endif %}
     {% endif %}
 {% endfor %}
-
 {% if active_licenses or expired_licenses %}
     <div class="build-cards">
         <!-- Активные лицензии -->
@@ -56,7 +52,6 @@
             </div>
             {% endif %}
         {% endfor %}
-
         <!-- Истекшие лицензии -->
         {% for license in expired_licenses %}
             {% if license.build %}
@@ -79,29 +74,4 @@
     <p>У вас пока нет купленных сборок.</p>
     <a href="{{ url_for('index') }}" class="btn">Посмотреть доступные сборки</a>
 {% endif %}
-
-<script>
-// Функция для конвертации UTC времени в локальное
-function convertToLocalTime() {
-    const timeElements = document.querySelectorAll('.local-time');
-    timeElements.forEach(element => {
-        const utcTime = element.getAttribute('data-utc-time');
-        if (utcTime) {
-            const date = new Date(utcTime);
-            const localTime = date.toLocaleString('ru-RU', {
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-                timeZoneName: 'short'
-            });
-            element.textContent = localTime;
-        }
-    });
-}
-
-// Выполняем конвертацию при загрузке страницы
-document.addEventListener('DOMContentLoaded', convertToLocalTime);
-</script>
 {% endblock %}
