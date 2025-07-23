@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+
+{% block title %}Админ-панель - Minecraft Marketplace{% endblock %}
+
+{% block content %}
+<h2>Админ-панель</h2>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-bottom: 30px;">
+    <div style="background-color: #1a1a2e; padding: 20px; border-radius: 8px; text-align: center;">
+        <h3>{{ total_users }}</h3>
+        <p>Пользователей</p>
+    </div>
+    <div style="background-color: #1a1a2e; padding: 20px; border-radius: 8px; text-align: center;">
+        <h3>{{ total_builds }}</h3>
+        <p>Сборок</p>
+    </div>
+    <div style="background-color: #1a1a2e; padding: 20px; border-radius: 8px; text-align: center;">
+        <h3>{{ total_sales }}</h3>
+        <p>Продаж</p>
+    </div>
+</div>
+
+<h3>Предоставить доступ к сборке</h3>
+<div class="form-container">
+    <form method="POST" action="{{ url_for('grant_access') }}">
+        <div class="form-group">
+            <label class="form-label">Пользователь</label>
+            <select name="user_id" class="form-input" required>
+                <option value="">Выберите пользователя</option>
+                {% for user in users %}
+                <option value="{{ user.id }}">{{ user.username }} ({{ user.email }})</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Сборка</label>
+            <select name="build_id" class="form-input" required>
+                <option value="">Выберите сборку</option>
+                {% for build in builds %}
+                <option value="{{ build.id }}">{{ build.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Срок действия</label>
+            <select name="duration" class="form-input" required>
+                <option value="5min">5 минут</option>
+                <option value="30min">30 минут</option>
+                <option value="1month" selected>1 месяц</option>
+            </select>
+        </div>
+        <button type="submit" class="btn">Предоставить доступ</button>
+    </form>
+</div>
+
+<h3>Отозвать доступ к сборке</h3>
+<div class="form-container">
+    <form method="POST" action="{{ url_for('revoke_access') }}">
+        <div class="form-group">
+            <label class="form-label">Пользователь</label>
+            <select name="user_id" class="form-input" required>
+                <option value="">Выберите пользователя</option>
+                {% for user in users %}
+                <option value="{{ user.id }}">{{ user.username }} ({{ user.email }})</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Сборка</label>
+            <select name="build_id" class="form-input" required>
+                <option value="">Выберите сборку</option>
+                {% for build in builds %}
+                <option value="{{ build.id }}">{{ build.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" class="btn" style="background-color: #cc4e4e;">Отозвать доступ</button>
+    </form>
+</div>
+
+<h3>Создать новую сборку</h3>
+<div class="form-container">
+    <form method="POST" action="{{ url_for('create_build') }}">
+        <div class="form-group">
+            <label class="form-label">Название сборки</label>
+            <input type="text" name="name" class="form-input" required>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Краткое описание</label>
+            <input type="text" name="description" class="form-input" required maxlength="200">
+            <small style="color: #a0a0a0;">Максимум 200 символов</small>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Полное описание</label>
+            <textarea name="long_description" class="form-input" rows="5"></textarea>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Цена (₽)</label>
+            <input type="number" name="price" class="form-input" min="0" required>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Версия Minecraft</label>
+            <input type="text" name="minecraft_version" class="form-input" required>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Автор</label>
+            <input type="text" name="author" class="form-input">
+        </div>
+        <button type="submit" class="btn">Создать сборку</button>
+    </form>
+</div>
+
+<h3>Все сборки</h3>
+{% if builds %}
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Название</th>
+                    <th>Цена</th>
+                    <th>Версия</th>
+                    <th>Автор</th>
+                    <th>Активна</th>
+                    <th>Действия</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for build in builds %}
+                <tr>
+                    <td>{{ build.id }}</td>
+                    <td>{{ build.name }}</td>
+                    <td>{{ build.price }} ₽</td>
+                    <td>{{ build.minecraft_version }}</td>
+                    <td>{{ build.author if build.author else 'Не указан' }}</td>
+                    <td>
+                        {% if build.is_active %}
+                            <span style="color: #4ecca3;">Да</span>
+                        {% else %}
+                            <span style="color: #cc4e4e;">Нет</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a href="{{ url_for('edit_build', build_id=build.id) }}" class="btn btn-secondary" style="padding: 5px 10px; font-size: 12px;">Редактировать</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% else %}
+    <p>Пока нет созданных сборок.</p>
+{% endif %}
+{% endblock %}

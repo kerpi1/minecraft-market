@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block title %}Редактировать сборку - Minecraft Marketplace{% endblock %}
+
+{% block content %}
+<h2>Редактировать сборку: {{ build.name }}</h2>
+
+<div class="form-container">
+    <form method="POST">
+        <div class="form-group">
+            <label class="form-label">Название сборки</label>
+            <input type="text" name="name" class="form-input" value="{{ build.name }}" required>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Краткое описание</label>
+            <input type="text" name="description" class="form-input" value="{{ build.description }}" required maxlength="200">
+            <small style="color: #a0a0a0;">Максимум 200 символов</small>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Полное описание</label>
+            <textarea name="long_description" class="form-input" rows="5">{{ build.long_description if build.long_description else '' }}</textarea>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Цена (₽)</label>
+            <input type="number" name="price" class="form-input" value="{{ build.price }}" min="0" required>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Версия Minecraft</label>
+            <input type="text" name="minecraft_version" class="form-input" value="{{ build.minecraft_version }}" required>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Автор</label>
+            <input type="text" name="author" class="form-input" value="{{ build.author if build.author else '' }}">
+        </div>
+        <div class="form-group">
+            <label class="form-label">
+                <input type="checkbox" name="is_active" {% if build.is_active %}checked{% endif %}> Активна
+            </label>
+        </div>
+        <button type="submit" class="btn">Сохранить изменения</button>
+        <a href="{{ url_for('admin') }}" class="btn btn-secondary" style="margin-left: 10px;">Отмена</a>
+    </form>
+</div>
+{% endblock %}

@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block title %}Главная - Minecraft Marketplace{% endblock %}
+
+{% block content %}
+<div class="hero">
+    <h1>Добро пожаловать в Minecraft Marketplace</h1>
+    <p>Здесь вы найдете лучшие приватные сборки Minecraft с продвинутой защитой</p>
+    <div style="margin-top: 20px;">
+        <a href="{{ url_for('download_launcher') }}" class="btn">Скачать лаунчер</a>
+    </div>
+</div>
+
+<h2>Доступные сборки</h2>
+<div class="build-cards">
+    {% if builds %}
+        {% for build in builds %}
+        <div class="build-card">
+            <h3 class="build-title">{{ build.name }}</h3>
+            <p class="build-description">{{ build.description }}</p>
+            <p class="build-price">{{ build.price }} ₽</p>
+            <div class="buttons-container">
+                <a href="{{ url_for('build_detail', build_id=build.id) }}" class="btn">Подробнее</a>
+                {% if current_user.is_authenticated %}
+                    {% set user_license = None %}
+                    {% for license in current_user.licenses %}
+                        {% if license.build_id == build.id and license.is_active %}
+                            {% set user_license = license %}
+                        {% endif %}
+                    {% endfor %}
+
+                    {% if user_license %}
+                        {% if not user_license.expires_at or user_license.expires_at > datetime.utcnow() %}
+                            <button class="btn btn-secondary" disabled>Уже куплено</button>
+                        {% else %}
+                            <form method="POST" action="{{ url_for('purchase_build', build_id=build.id) }}">
+                                <button type="submit" class="btn btn-secondary">Продлить</button>
+                            </form>
+                        {% endif %}
+                    {% else %}
+                        <form method="POST" action="{{ url_for('purchase_build', build_id=build.id) }}">
+                            <button type="submit" class="btn">Купить</button>
+                        </form>
+                    {% endif %}
+                {% else %}
+                    <a href="{{ url_for('login') }}" class="btn btn-secondary">Войдите для покупки</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <p>Пока нет доступных сборок.</p>
+    {% endif %}
+</div>
+
+<div style="margin-top: 50px; text-align: center; background-color: #1a1a2e; padding: 30px; border-radius: 8px;">
+    <h3>Хотите разместить свою сборку?</h3>
+    <p>Свяжитесь с нами по email: contact@marketplace.local</p>
+    <p>Наша команда администраторов поможет вам разместить вашу сборку на маркетплейсе.</p>
+</div>
+{% endblock %}

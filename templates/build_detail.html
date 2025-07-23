@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+
+{% block title %}{{ build.name }} - Minecraft Marketplace{% endblock %}
+
+{% block content %}
+<div style="background-color: #1a1a2e; padding: 30px; border-radius: 8px; margin-bottom: 30px;">
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;">
+        <div>
+            <h1>{{ build.name }}</h1>
+            <p style="color: #a0a0a0; font-size: 18px;">{{ build.minecraft_version }}</p>
+            <p style="color: #4ecca3; font-size: 24px; font-weight: bold;">{{ build.price }} ₽</p>
+        </div>
+        <div>
+            {% if current_user.is_authenticated %}
+                {% set user_license = None %}
+                {% for license in current_user.licenses %}
+                    {% if license.build_id == build.id and license.is_active %}
+                        {% set user_license = license %}
+                    {% endif %}
+                {% endfor %}
+
+                {% if user_license %}
+                    {% if not user_license.expires_at or user_license.expires_at > datetime.utcnow() %}
+                        <button class="btn" disabled>Уже куплено</button>
+                    {% else %}
+                        <form method="POST" action="{{ url_for('purchase_build', build_id=build.id) }}">
+                            <button type="submit" class="btn btn-secondary">Продлить</button>
+                        </form>
+                    {% endif %}
+                {% else %}
+                    <form method="POST" action="{{ url_for('purchase_build', build_id=build.id) }}">
+                        <button type="submit" class="btn">Купить</button>
+                    </form>
+                {% endif %}
+            {% else %}
+                <a href="{{ url_for('login') }}" class="btn">Войдите для покупки</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div style="margin-bottom: 20px;">
+        <h3>Автор: {{ build.author if build.author else 'Не указан' }}</h3>
+        <!-- Показ времени истечения на странице сборки -->
+        {% if current_user.is_authenticated %}
+            {% set user_license = None %}
+            {% for license in current_user.licenses %}
+                {% if license.build_id == build.id and license.is_active %}
+                    {% set user_license = license %}
+                {% endif %}
+            {% endfor %}
+
+            {% if user_license %}
+                {% if user_license.expires_at %}
+                    {% if user_license.expires_at > datetime.utcnow() %}
+                        <p><strong>Ваш доступ истекает:</strong>
+                            <span class="local-time" data-utc-time="{{ user_license.expires_at.isoformat() }}Z">
+                                {{ user_license.expires_at.strftime('%d.%m.%Y %H:%M') }} UTC
+                            </span>
+                        </p>
+                    {% else %}
+                        <p><strong>Статус:</strong> <span style="color: #cc4e4e;">Ваш доступ истёк!</span></p>
+                    {% endif %}
+                {% else %}
+                    <p><strong>Статус:</strong> <span style="color: #4ecca3;">Бессрочный доступ</span></p>
+                {% endif %}
+            {% endif %}
+        {% endif %}
+    </div>
+
+    <div style="margin-bottom: 30px;">
+        <h3>Описание</h3>
+        <p style="line-height: 1.6;">{{ build.long_description if build.long_description else build.description }}</p>
+    </div>
+
+    <div>
+        <h3>Скриншоты</h3>
+        <p>Здесь будут скриншоты сборки (функционал будет добавлен позже)</p>
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; margin-top: 15px;">
+            <div style="background-color: #2d2d44; height: 150px; border-radius: 4px; display: flex; align-items: center; justify-content: center;">
+                <span>Скриншот 1</span>
+            </div>
+            <div style="background-color: #2d2d44; height: 150px; border-radius: 4px; display: flex; align-items: center; justify-content: center;">
+                <span>Скриншот 2</span>
+            </div>
+            <div style="background-color: #2d2d44; height: 150px; border-radius: 4px; display: flex; align-items: center; justify-content: center;">
+                <span>Скриншот 3</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div style="text-align: center; margin-top: 30px;">
+    <a href="{{ url_for('index') }}" class="btn btn-secondary">← Назад к сборкам</a>
+</div>
+
+<script>
+// Функция для конвертации UTC времени в локальное
+function convertToLocalTime() {
+    const timeElements = document.querySelectorAll('.local-time');
+    timeElements.forEach(element => {
+        const utcTime = element.getAttribute('data-utc-time');
+        if (utcTime) {
+            const date = new Date(utcTime);
+            const localTime = date.toLocaleString('ru-RU', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                timeZoneName: 'short'
+            });
+            element.textContent = localTime;
+        }
+    });
+}
+
+// Выполняем конвертацию при загрузке страницы
+document.addEventListener('DOMContentLoaded', convertToLocalTime);
+</script>
+{% endblock %}
